@@ -1,0 +1,24 @@
+{application, aurafs_mw,
+ [{description, "aurafs middleware"},
+  {vsn, "0.1.0"},
+  {registered, [mongo_pool, mongo_reg]},
+  {mod, { aurafs_mw_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    lager,
+    uuid,
+    mongodb
+   ]},
+  {env,[
+   {aurafs_mw, [
+    {topology, {single, "127.0.0.1:27017"}},
+    {database, aurafs}
+   ]}
+  ]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.
