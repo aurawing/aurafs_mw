@@ -20,8 +20,11 @@
 start(_StartType, _StartArgs) ->
     {ok, Conf} = application:get_env(aurafs_mw),
     {topology, Topology} = lists:keyfind(topology, 1, Conf),
-    {database, Database} = lists:keyfind(database, 1, Conf),
-    {ok, _Topology} = mongoc:connect( Topology, [{name, ?MONGO_POOL}, {register, ?MONGO_REG}], [{database, Database}] ).
+    {options, Options} = lists:keyfind(options, 1, Conf),
+    {worker_options, Worker_Options} = lists:keyfind(worker_options, 1, Conf),
+    Options2 = lists:keystore(register, 1, Options, {name, ?MONGO_POOL}),
+    Options3 = lists:keystore(register, 1, Options2, {name, ?MONGO_REG}),
+    {ok, _Topology} = mongoc:connect( Topology, Options3, Worker_Options).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
