@@ -26,4 +26,4 @@ stop(_State) ->
 %%====================================================================
 test() ->
     application:ensure_all_started(aurafs_mw),
-    aurafs_mw_account:create_account(<<"test2">>, <<"123456">>, -1).
+    aurafs_mw_account:create_account(<<"test3">>, <<"123456">>, -1).

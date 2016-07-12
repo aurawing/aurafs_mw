@@ -36,7 +36,7 @@ init([]) ->
     {options, Options} = lists:keyfind(options, 1, Conf),
     {worker_options, Worker_Options} = lists:keyfind(worker_options, 1, Conf),
     Options2 = lists:keystore(register, 1, Options, {name, ?MONGO_POOL}),
-    Options3 = lists:keystore(register, 1, Options2, {name, ?MONGO_REG}),
+    Options3 = lists:keystore(register, 1, Options2, {register, ?MONGO_REG}),
     SPEC1 = ?CHILD_SPEC(mc_pool_sup, [], permanent, 2000, supervisor),
     SPEC2 = ?CHILD_SPEC(mc_topology, [Topology, Options3, Worker_Options], permanent, 2000, worker),
     {ok, { {one_for_one, 0, 1}, [
