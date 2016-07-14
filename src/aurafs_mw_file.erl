@@ -7,7 +7,7 @@
 %%% Created : 12. 七月 2016 下午10:13
 %%%-------------------------------------------------------------------
 -module(aurafs_mw_file).
--author("root").
+-author("aurawing").
 
 -define(FILE_TBL, <<"file">>).
 
