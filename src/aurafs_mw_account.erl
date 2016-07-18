@@ -16,17 +16,18 @@
 
 -export_type([account/0]).
 
--type account() :: #{ _Id :: binary() => {binary()},
-                      Username :: binary() => binary(),
-                      Password :: binary() => binary(),
-                      Token :: binary() => binary(),
-                      CreateTime :: binary() => tuple(),
-                      Space :: binary() => integer()}.
+-type account() :: #{ _Id :: binary() => {binary()},    % {"_id"=ObjectId("XXXXXX"),
+                      Username :: binary() => binary(), %   "username"="XXXXXX",
+                      Password :: binary() => binary(), %   "password"="91285d1aef...",
+                      Token :: binary() => binary(),    %   "token"="a5b75d4567f665e...",
+                      CreateTime :: binary() => tuple(),%   "create_time"=new Date(),
+                      Space :: binary() => integer(),   %   "space"=1024000,
+                      RootDir :: binary() => binary()}. %   "root_dir"="6ab8c87d98..."}
 
 %%% @doc
 %%% 使用用户名、密码和空间大小创建帐号，空间大小为-1相当于无限制，如帐号已存在则返回错误信息
 %%% @end
--spec create_account(binary(), binary(), integer()) -> {ok, account()} | {error, insert_failed, [tuple()]}.
+-spec create_account(binary(), binary(), integer()) -> {ok, account()} | {error, insert_failed, tuple()}.
 create_account(Username, Password, Space) ->
   Token = aurafs_mw_digest:hex(uuid:uuid1()),
   Account = #{<<"username">> => Username,
@@ -39,7 +40,7 @@ create_account(Username, Password, Space) ->
       mc_worker_api:insert(Worker, ?ACCOUNT_TBL, Account)
     end),
   case maps:is_key(<<"writeErrors">>, Status) of
-    true -> {error, insert_failed, maps:get(<<"writeErrors">>, Status)};
+    true -> {error, insert_failed, hd(maps:get(<<"writeErrors">>, Status))};
     false -> {ok, Account}
   end.
 
