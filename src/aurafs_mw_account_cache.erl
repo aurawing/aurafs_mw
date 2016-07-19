@@ -17,14 +17,14 @@ init() ->
 
 get(Token) ->
   case ets:lookup(?MODULE, Token) of
-    [] -> process_result(aurafs_mw_account:authorize_account(Token));
+    [] -> fill_cache(aurafs_mw_account:authorize_account(Token));
     [{Token, Account}] -> {ok, Account}
   end.
 
-process_result({ok, Account}) ->
+fill_cache({ok, Account}) ->
   #{<<"token">> := Token} = Account,
   true = ets:insert(?MODULE, {Token, Account}),
   {ok, Account};
-process_result({error ,Reason}) ->
+fill_cache({error ,Reason}) ->
   {error ,Reason}.
 

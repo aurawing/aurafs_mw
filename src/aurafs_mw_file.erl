@@ -11,16 +11,16 @@
 
 -define(FILE_TBL, <<"file">>).
 
--define(FileId, <<"_id">>).
--define(Type, <<"_id">>).
+-define(D, <<"d">>).
+-define(F, <<"f">>).
 
 %% API
--export([]).
+-export([create_dir/8]).
 
 -export_type([file/0]).
 
 -type file() :: #{ FileId :: binary() => {binary()},    % {"_id" : ObjectId("XXXXXX"),
-                   Type :: binary() => f | d,           %  "type" : "f",
+                   Type :: binary() => binary(),        %  "type" : "f",
                    Owner :: binary() => binary(),       %  "owner" : "6a6878a878d89f898...",
                    Name :: binary() => binary(),        %  "name" : "testfile.txt",
                    Pid :: binary() => binary(),         %  "pid" : "556a768d8a6c6db7634cb3",
@@ -39,6 +39,51 @@
                       Digest :: binary() => binary(),                 %  "digest" => "7868a7687a68a867868767c68768df768768...",
                       Curver :: binary() => boolean(),                %  "curver" => true,
                       Ext :: binary() => map() }.                     %  "ext"={"X1":"Y1","X2","Y2",...} }
+file(Type, Owner, Name, Pid, Apid, Identity, Maxver, VerNo, Fd, CreateTime, ModifyTime, InsertTime, Size, Digest, Curver, Ext_g, Ext_v) ->
+  #{<<"type">> => Type,
+    <<"owner">> => Owner,
+    <<"name">> => Name,
+    <<"pid">> => Pid,
+    <<"apid">> => Apid,
+    <<"identity">> => Identity,
+    <<"maxver">> => Maxver,
+    <<"ext">> => Ext_g,
+    <<"versions">> => [
+      #{<<"verno">> => VerNo,
+        <<"fd">> => Fd,
+        <<"create_time">> => CreateTime,
+        <<"modify_time">> => ModifyTime,
+        <<"insert_time">> => InsertTime,
+        <<"size">> => Size,
+        <<"digest">> => Digest,
+        <<"curver">> => Curver,
+        <<"ext">> => Ext_v}
+    ]
+  }.
+
+create_dir(Token, Owner, Name, Pid, Apid, CreateTime, ModifyTime, Ext) ->
+  case aurafs_mw_account:is_super_user(Token) of
+    true ->
+      Dir = file(<<"d">>, Owner, Name, <<"1">>, [<<"1">>],aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, $1>>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext, #{}),
+      save_dir(Dir);
+    false ->
+      if
+        Token /= Owner -> {error, unauthorized};
+        true ->
+          Dir = file(<<"d">>, Owner, Name, Pid, Apid,aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, Pid/binary>>), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext, #{}),
+          save_dir(Dir)
+      end
+  end.
+
+save_dir(Dir) ->
+  {{true, Status}, Dir1} = mongoc:transaction(mongo_reg,
+    fun(Worker) ->
+      mc_worker_api:insert(Worker, ?FILE_TBL, Dir)
+    end),
+  case maps:is_key(<<"writeErrors">>, Status) of
+    true -> {error, insert_failed, hd(maps:get(<<"writeErrors">>, Status))};
+    false -> {ok, Dir1}
+  end.
 
 
 

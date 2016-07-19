@@ -10,9 +10,10 @@
 -author("aurawing").
 
 -define(ACCOUNT_TBL, <<"account">>).
+-define(SUPER_USER_TOKEN, <<"1">>).
 
 %% API
--export([create_account/3, login_account/2, authorize_account/1]).
+-export([create_account/3, login_account/2, authorize_account/1, is_super_user/1]).
 
 -export_type([account/0]).
 
@@ -35,13 +36,13 @@ create_account(Username, Password, Space) ->
               <<"token">> => Token,
               <<"space">> => Space,
               <<"create_time">> => os:timestamp()},
-  {{true, Status}, _Account} = mongoc:transaction(mongo_reg,
+  {{true, Status}, Account1} = mongoc:transaction(mongo_reg,
     fun(Worker) ->
       mc_worker_api:insert(Worker, ?ACCOUNT_TBL, Account)
     end),
   case maps:is_key(<<"writeErrors">>, Status) of
     true -> {error, insert_failed, hd(maps:get(<<"writeErrors">>, Status))};
-    false -> {ok, Account}
+    false -> {ok, Account1}
   end.
 
 %%% @doc
@@ -71,3 +72,6 @@ authorize_account(Token) ->
     Account == #{} -> {error, unauthorized};
     true -> {ok, Account}
   end.
+
+is_super_user(Token) ->
+  Token==?SUPER_USER_TOKEN.
