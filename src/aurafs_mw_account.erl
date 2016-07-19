@@ -12,7 +12,7 @@
 -define(ACCOUNT_TBL, <<"account">>).
 
 %% API
--export([create_account/3, login_account/2]).
+-export([create_account/3, login_account/2, authorize_account/1]).
 
 -export_type([account/0]).
 
@@ -35,7 +35,7 @@ create_account(Username, Password, Space) ->
               <<"token">> => Token,
               <<"space">> => Space,
               <<"create_time">> => os:timestamp()},
-  {{true, Status}, Account} = mongoc:transaction(mongo_reg,
+  {{true, Status}, _Account} = mongoc:transaction(mongo_reg,
     fun(Worker) ->
       mc_worker_api:insert(Worker, ?ACCOUNT_TBL, Account)
     end),
@@ -45,11 +45,29 @@ create_account(Username, Password, Space) ->
   end.
 
 %%% @doc
-%%% 使用帐号和密码登陆，并返回用户信息，登录失败返回空map
+%%% 使用帐号和密码登陆，并返回用户信息，登录失败返回error
 %%% @end
--spec login_account(binary(), binary()) -> account() | #{}.
+-spec login_account(binary(), binary()) -> {ok, account()} | {error, login_failed}.
 login_account(Username, Password) ->
-  mongoc:transaction_query(mongo_reg,
+  Account = mongoc:transaction_query(mongo_reg,
     fun(Conf) ->
       mongoc:find_one(Conf, ?ACCOUNT_TBL, #{<<"username">> => Username, <<"password">> => aurafs_mw_digest:md5(Password)}, #{}, 0)
-    end).
+    end),
+  if
+    Account == #{} -> {error, login_failed};
+    true -> {ok, Account}
+  end.
+
+%%% @doc
+%%% 通过token获取用户信息，登录失败返回error
+%%% @end
+-spec authorize_account(binary()) -> {ok, account()} | {error, unauthorized}.
+authorize_account(Token) ->
+  Account = mongoc:transaction_query(mongo_reg,
+    fun(Conf) ->
+      mongoc:find_one(Conf, ?ACCOUNT_TBL, #{<<"token">> => Token}, #{}, 0)
+    end),
+  if
+    Account == #{} -> {error, unauthorized};
+    true -> {ok, Account}
+  end.
