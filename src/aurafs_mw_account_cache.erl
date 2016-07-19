@@ -26,5 +26,5 @@ fill_cache({ok, Account}) ->
   true = ets:insert(?MODULE, {Token, Account}),
   {ok, Account};
 fill_cache({error ,Reason}) ->
-  {error ,Reason}.
+  {error, Reason}.
 

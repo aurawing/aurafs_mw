@@ -64,18 +64,21 @@ file(Type, Owner, Name, Pid, Apid, Identity, Maxver, VerNo, Fd, CreateTime, Modi
 create_dir(Token, Owner, Name, Pid, Apid, CreateTime, ModifyTime, Ext) ->
   case aurafs_mw_account:is_super_user(Token) of
     true ->
-      Dir = file(<<"d">>, Owner, Name, <<"1">>, [<<"1">>],aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, $1>>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext, #{}),
-      save_dir(Dir);
+      save_dir(<<"d">>, Owner, Name, <<"1">>, [<<"1">>], aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, $1>>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext, #{});
     false ->
       if
         Token /= Owner -> {error, unauthorized};
         true ->
-          Dir = file(<<"d">>, Owner, Name, Pid, Apid,aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, Pid/binary>>), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext, #{}),
-          save_dir(Dir)
+          case aurafs_mw_account_cache:get(Token) of
+            {error, _Reason} -> {error, unauthorized};
+            {ok, _Account} ->
+              save_dir(<<"d">>, Owner, Name, Pid, Apid, aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, Pid/binary>>), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext, #{})
+          end
       end
   end.
 
-save_dir(Dir) ->
+save_dir(Type, Owner, Name, Pid, Apid, Identity, Maxver, Verno, Fd, CreateTime, ModifyTime, InsertTime, Size, Digest, Curver, Ext_g, Ext_v) ->
+  Dir = file(Type, Owner, Name, Pid, Apid, Identity, Maxver, Verno, Fd, CreateTime, ModifyTime, InsertTime, Size, Digest, Curver, Ext_g, Ext_v),
   {{true, Status}, Dir1} = mongoc:transaction(mongo_reg,
     fun(Worker) ->
       mc_worker_api:insert(Worker, ?FILE_TBL, Dir)
