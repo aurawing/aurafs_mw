@@ -9,6 +9,8 @@
 -module(aurafs_mw_account_cache).
 -author("aurawing").
 
+-include("../include/log.hrl").
+
 %% API
 -export([init/0, get/1]).
 

@@ -7,16 +7,23 @@
 
 -behaviour(application).
 
+-include("../include/log.hrl").
+
 %% Application callbacks
--export([start/2, stop/1, test/0]).
+-export([start/2, stop/1]).
 
 %%====================================================================
 %% API
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    aurafs_mw_account_cache:init(),
-    aurafs_mw_sup:start_link().
+    ?I("Starting account cache module...", []),
+    Tab_Name = aurafs_mw_account_cache:init(),
+    ?I("Account cache module started with reg name: ~p", [Tab_Name]),
+    ?I("Starting main supervisor...", []),
+    {ok, Sup_Pid} = aurafs_mw_sup:start_link(),
+    ?I("Main supervisor started with pid: ~p", [Sup_Pid]),
+    {ok, Sup_Pid}.
 
 %%--------------------------------------------------------------------
 stop(_State) ->
@@ -25,6 +32,3 @@ stop(_State) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
-test() ->
-    application:ensure_all_started(aurafs_mw),
-    aurafs_mw_account:create_account(<<"test3">>, <<"123456">>, -1).

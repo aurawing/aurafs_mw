@@ -9,6 +9,8 @@
 -module(aurafs_mw_digest).
 -author("aurawing").
 
+-include("../include/log.hrl").
+
 %% API
 -export([hex/1, md5/1, sha1/1]).
 

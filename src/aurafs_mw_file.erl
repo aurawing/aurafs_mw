@@ -2,20 +2,19 @@
 %%% @author root
 %%% @copyright (C) 2016, <COMPANY>
 %%% @doc
-%%%
+%%% 文件和文件夹操作相关功能
 %%% @end
 %%% Created : 12. 七月 2016 下午10:13
 %%%-------------------------------------------------------------------
 -module(aurafs_mw_file).
 -author("aurawing").
 
--define(FILE_TBL, <<"file">>).
-
--define(D, <<"d">>).
--define(F, <<"f">>).
+-include("../include/file.hrl").
+-include("../include/errors.hrl").
+-include("../include/log.hrl").
 
 %% API
--export([create_dir/8]).
+-export([create_dir/6, get_file_by_id/1]).
 
 -export_type([file/0]).
 
@@ -39,42 +38,68 @@
                       Digest :: binary() => binary(),                 %  "digest" => "7868a7687a68a867868767c68768df768768...",
                       Curver :: binary() => boolean(),                %  "curver" => true,
                       Ext :: binary() => map() }.                     %  "ext"={"X1":"Y1","X2","Y2",...} }
+
 file(Type, Owner, Name, Pid, Apid, Identity, Maxver, VerNo, Fd, CreateTime, ModifyTime, InsertTime, Size, Digest, Curver, Ext_g, Ext_v) ->
-  #{<<"type">> => Type,
-    <<"owner">> => Owner,
-    <<"name">> => Name,
-    <<"pid">> => Pid,
-    <<"apid">> => Apid,
-    <<"identity">> => Identity,
-    <<"maxver">> => Maxver,
-    <<"ext">> => Ext_g,
-    <<"versions">> => [
-      #{<<"verno">> => VerNo,
-        <<"fd">> => Fd,
-        <<"create_time">> => CreateTime,
-        <<"modify_time">> => ModifyTime,
-        <<"insert_time">> => InsertTime,
-        <<"size">> => Size,
-        <<"digest">> => Digest,
-        <<"curver">> => Curver,
-        <<"ext">> => Ext_v}
+  #{?F_TYPE => Type,
+    ?F_OWNER => Owner,
+    ?F_NAME => Name,
+    ?F_PID => Pid,
+    ?F_APID => Apid,
+    ?F_IDENTITY => Identity,
+    ?F_MAXVER => Maxver,
+    ?F_EXT_G => Ext_g,
+    ?F_VERSIONS => [
+      #{?F_VERNO => VerNo,
+        ?F_FD => Fd,
+        ?F_CREATE_TIME => CreateTime,
+        ?F_MODIFY_TIME => ModifyTime,
+        ?F_INSERT_TIME => InsertTime,
+        ?F_SIZE => Size,
+        ?F_DIGEST => Digest,
+        ?F_CURVER => Curver,
+        ?F_EXT_V => Ext_v}
     ]
   }.
 
-create_dir(Token, Owner, Name, Pid, Apid, CreateTime, ModifyTime, Ext) ->
+%%% @doc
+%%% 创建文件夹
+%%% @end
+-spec create_dir(binary(), binary(), binary(), aurafs_mw:unixtime(), aurafs_mw:unixtime(), map()) -> {ok, file()} | aurafs_mw:unauthorized() | aurafs_mw:insert_failed(tuple()).
+create_dir(Token, Name, Pid, CreateTime, ModifyTime, Ext_g) ->
   case aurafs_mw_account:is_super_user(Token) of
     true ->
-      save_dir(<<"d">>, Owner, Name, <<"1">>, [<<"1">>], aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, $1>>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext, #{});
+      save_dir(?FTYPE_D, Token, Name, <<"1">>, [<<"1">>], ?CREATE_IDENTITY(?FTYPE_D, Name, <<"1">>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext_g, #{});
     false ->
-      if
-        Token /= Owner -> {error, unauthorized};
-        true ->
-          case aurafs_mw_account_cache:get(Token) of
-            {error, _Reason} -> {error, unauthorized};
-            {ok, _Account} ->
-              save_dir(<<"d">>, Owner, Name, Pid, Apid, aurafs_mw_digest:sha1(<<$d, $|, Name/binary, $|, Pid/binary>>), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext, #{})
+      case aurafs_mw_account_cache:get(Token) of
+        {error, _Reason} -> ?UNAUTHORIZED;
+        {ok, _Account} ->
+          case check_pid(Pid, Token) of
+            {true, #{?F_APID := Apid}} -> save_dir(?FTYPE_D, Token, Name, Pid, lists:reverse([Pid|lists:reverse(Apid)]), ?CREATE_IDENTITY(?FTYPE_D, Name, Pid), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext_g, #{});
+            false -> ?DIR_ACCESS_DENIED;
+            no_folder -> ?NO_DIR
           end
       end
+  end.
+
+%%% @doc
+%%% 根据id获取文件信息
+%%% @end
+-spec get_file_by_id(binary()) -> file() | #{}.
+get_file_by_id(Id) ->
+  mongoc:transaction_query(mongo_reg,
+    fun(Conf) ->
+      mongoc:find_one(Conf, ?FILE_TBL, #{?F_ID => Id}, #{}, 0)
+    end).
+
+check_pid(Pid, Owner) ->
+  Dir = get_file_by_id(Pid),
+  check_pid1(Dir, Owner).
+
+check_pid1(#{}, _) -> no_folder;
+check_pid1(Dir, Owner) ->
+  case maps:find(?F_OWNER, Dir) of
+    {ok, Owner} -> {true, Dir};
+    error -> false
   end.
 
 save_dir(Type, Owner, Name, Pid, Apid, Identity, Maxver, Verno, Fd, CreateTime, ModifyTime, InsertTime, Size, Digest, Curver, Ext_g, Ext_v) ->
@@ -84,12 +109,6 @@ save_dir(Type, Owner, Name, Pid, Apid, Identity, Maxver, Verno, Fd, CreateTime, 
       mc_worker_api:insert(Worker, ?FILE_TBL, Dir)
     end),
   case maps:is_key(<<"writeErrors">>, Status) of
-    true -> {error, insert_failed, hd(maps:get(<<"writeErrors">>, Status))};
+    true -> ?INSERT_FAILED(hd(maps:get(<<"writeErrors">>, Status)));
     false -> {ok, Dir1}
   end.
-
-
-
-
-
-
