@@ -34,5 +34,6 @@
 -define(FTYPE_F, <<"f">>).
 
 -define(ROOT_PID, <<"1">>).
+-define(ROOT_DIR_ID, <<"1">>).
 
 -define(CREATE_IDENTITY(Type, Name, Pid), aurafs_mw_digest:sha1(<<Type/binary, $|, Name/binary, $|, Pid/binary>>)).

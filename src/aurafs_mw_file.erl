@@ -68,13 +68,13 @@ file(Type, Owner, Name, Pid, Apid, Identity, Maxver, VerNo, Fd, CreateTime, Modi
 create_dir(Token, Name, Pid, CreateTime, ModifyTime, Ext_g) ->
   case aurafs_mw_account:is_super_user(Token) of
     true ->
-      save_dir(?FTYPE_D, Token, Name, <<"1">>, [<<"1">>], ?CREATE_IDENTITY(?FTYPE_D, Name, <<"1">>), 1, 1, <<"">>, os:timestamp(), os:timestamp(), os:timestamp(), 0, <<"">>, true, Ext_g, #{});
+      save_dir(?FTYPE_D, Token, Name, ?ROOT_DIR_ID, [?ROOT_DIR_ID], ?CREATE_IDENTITY(?FTYPE_D, Name, ?ROOT_DIR_ID), 1, 1, null, os:timestamp(), os:timestamp(), os:timestamp(), 0, null, true, Ext_g, #{});
     false ->
       case aurafs_mw_account_cache:get(Token) of
         {error, _Reason} -> ?UNAUTHORIZED;
         {ok, _Account} ->
           case check_pid(Pid, Token) of
-            {true, #{?F_APID := Apid}} -> save_dir(?FTYPE_D, Token, Name, Pid, lists:reverse([Pid|lists:reverse(Apid)]), ?CREATE_IDENTITY(?FTYPE_D, Name, Pid), 1, 1, <<"">>, CreateTime, ModifyTime, os:timestamp(), 0, <<"">>, true, Ext_g, #{});
+            {true, #{?F_APID := Apid}} -> save_dir(?FTYPE_D, Token, Name, Pid, lists:reverse([Pid|lists:reverse(Apid)]), ?CREATE_IDENTITY(?FTYPE_D, Name, Pid), 1, 1, null, CreateTime, ModifyTime, os:timestamp(), 0, null, true, Ext_g, #{});
             false -> ?DIR_ACCESS_DENIED;
             no_folder -> ?NO_DIR
           end
