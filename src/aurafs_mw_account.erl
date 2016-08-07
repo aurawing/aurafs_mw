@@ -33,7 +33,7 @@
 -spec create_account(binary(), binary(), integer()) -> {ok, account()} | aurafs_mw:insert_failed(tuple()).
 create_account(Username, Password, Space) ->
   Token = aurafs_mw_digest:hex(uuid:uuid1()),
-  {ok, RootDir} = aurafs_mw_file:create_dir(?SUPER_USER_TOKEN, Token, ?ROOT_PID, os:timestamp(), os:timestamp(), #{}),
+  RootDir = aurafs_mw_file:create_dir(?SUPER_USER_TOKEN, Token, ?ROOT_PID, os:timestamp(), os:timestamp(), #{}),
   Account = #{?A_USERNAME => Username,
               ?A_PASSWORD => aurafs_mw_digest:md5(Password),
               ?A_TOKEN => Token,
@@ -59,7 +59,7 @@ login_account(Username, Password) ->
       mongoc:find_one(Conf, ?ACCOUNT_TBL, #{?A_USERNAME => Username, ?A_PASSWORD => aurafs_mw_digest:md5(Password)}, #{}, 0)
     end),
   if
-    Account == #{} -> ?LOGIN_FAILED;
+    Account == #{} -> throw(?LOGIN_FAILED);
     true -> {ok, Account}
   end.
 

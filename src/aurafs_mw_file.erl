@@ -70,14 +70,11 @@ create_dir(Token, Name, Pid, CreateTime, ModifyTime, Ext_g) ->
     true ->
       save_dir(?FTYPE_D, Token, Name, ?ROOT_DIR_ID, [?ROOT_DIR_ID], ?CREATE_IDENTITY(?FTYPE_D, Name, ?ROOT_DIR_ID), 1, 1, null, os:timestamp(), os:timestamp(), os:timestamp(), 0, null, true, Ext_g, #{});
     false ->
-      case aurafs_mw_account_cache:get(Token) of
-        {error, _Reason} -> ?UNAUTHORIZED;
-        {ok, _Account} ->
-          case check_pid(Pid, Token) of
-            {true, #{?F_APID := Apid}} -> save_dir(?FTYPE_D, Token, Name, Pid, lists:reverse([Pid|lists:reverse(Apid)]), ?CREATE_IDENTITY(?FTYPE_D, Name, Pid), 1, 1, null, CreateTime, ModifyTime, os:timestamp(), 0, null, true, Ext_g, #{});
-            false -> ?DIR_ACCESS_DENIED;
-            no_folder -> ?NO_DIR
-          end
+      _Account = aurafs_mw_account_cache:get(Token),
+      case check_pid(Pid, Token) of
+        {true, #{?F_APID := Apid}} -> save_dir(?FTYPE_D, Token, Name, Pid, lists:reverse([Pid|lists:reverse(Apid)]), ?CREATE_IDENTITY(?FTYPE_D, Name, Pid), 1, 1, null, CreateTime, ModifyTime, os:timestamp(), 0, null, true, Ext_g, #{});
+        false -> throw(?DIR_ACCESS_DENIED);
+        no_folder -> throw(?NO_DIR)
       end
   end.
 
@@ -86,13 +83,20 @@ create_dir(Token, Name, Pid, CreateTime, ModifyTime, Ext_g) ->
 %%% @end
 -spec get_file_by_id(binary()) -> file() | #{}.
 get_file_by_id(Id) ->
+  get_file_by_id(Id, #{}).
+
+%%% @doc
+%%% 根据id获取文件信息,返回过滤后的属性
+%%% @end
+-spec get_file_by_id(binary(), map()) -> file() | #{}.
+get_file_by_id(Id, Filter) ->
   mongoc:transaction_query(mongo_reg,
     fun(Conf) ->
-      mongoc:find_one(Conf, ?FILE_TBL, #{?F_ID => Id}, #{}, 0)
+      mongoc:find_one(Conf, ?FILE_TBL, #{?F_ID => Id}, Filter, 0)
     end).
 
 check_pid(Pid, Owner) ->
-  Dir = get_file_by_id(Pid),
+  Dir = get_file_by_id(Pid, #{?F_OWNER => true}),
   check_pid1(Dir, Owner).
 
 check_pid1(#{}, _) -> no_folder;
@@ -109,6 +113,6 @@ save_dir(Type, Owner, Name, Pid, Apid, Identity, Maxver, Verno, Fd, CreateTime, 
       mc_worker_api:insert(Worker, ?FILE_TBL, Dir)
     end),
   case maps:is_key(<<"writeErrors">>, Status) of
-    true -> ?INSERT_FAILED(hd(maps:get(<<"writeErrors">>, Status)));
-    false -> {ok, Dir1}
+    true -> throw(?INSERT_FAILED(hd(maps:get(<<"writeErrors">>, Status))));
+    false -> Dir1
   end.

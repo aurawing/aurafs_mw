@@ -9,6 +9,7 @@
 -module(aurafs_mw_account_cache).
 -author("aurawing").
 
+-include("../include/account.hrl").
 -include("../include/log.hrl").
 
 %% API
@@ -20,13 +21,13 @@ init() ->
 get(Token) ->
   case ets:lookup(?MODULE, Token) of
     [] -> fill_cache(aurafs_mw_account:authorize_account(Token));
-    [{Token, Account}] -> {ok, Account}
+    [{Token, Account}] -> Account
   end.
 
 fill_cache({ok, Account}) ->
-  #{<<"token">> := Token} = Account,
+  #{?A_TOKEN := Token} = Account,
   true = ets:insert(?MODULE, {Token, Account}),
-  {ok, Account};
+  Account;
 fill_cache({error ,Reason}) ->
-  {error, Reason}.
+  throw({error, Reason}).
 
